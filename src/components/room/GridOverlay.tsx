@@ -17,6 +17,8 @@ export function GridOverlay({
   const LINE_COLOR = "#3986d5";
   const POINT_COLOR = "#FF0000";
 
+  if (!showGrid) return null;
+
   return (
     <>
       <group position={[-0.5, 0.001, -0.5]} visible={showGrid}>
