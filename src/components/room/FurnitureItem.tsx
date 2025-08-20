@@ -20,18 +20,25 @@ const FurnitureItem = forwardRef<THREE.Object3D, FurnitureItemProps>(
 
     const fbxModel = useFBX(
       catalogObject?.type === "fbx"
-        ? catalogObject.modelUrl + "model.fbx"
+        ? "/models/" + catalogObject.id + "/model.fbx"
         : "/models/empty.fbx"
     );
     const gltfModel = useGLTF(
       catalogObject?.type === "gltf"
-        ? catalogObject.modelUrl + "model.gltf"
+        ? "/models/" + catalogObject.id + "/model.gltf"
+        : "/models/empty.glb"
+    );
+
+    const glbModel = useGLTF(
+      catalogObject?.type === "glb"
+        ? "/models/" + catalogObject.id + "/model.glb"
         : "/models/empty.gltf"
     );
 
     let model: THREE.Object3D | null = null;
     if (catalogObject?.type === "fbx") model = fbxModel;
     else if (catalogObject?.type === "gltf") model = gltfModel.scene;
+    else if (catalogObject?.type === "glb") model = glbModel.scene;
 
     const modelInstance = useMemo(() => {
       if (!model) return null;

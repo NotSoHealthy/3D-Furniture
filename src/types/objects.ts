@@ -1,9 +1,14 @@
+export type Category = {
+  id: string;
+  name: string;
+  icon: string;
+};
+
 export type CatalogObject = {
   id: string;
   name: string;
-  modelUrl: string;
-  type: "fbx" | "gltf";
-  category: string;
+  type: "fbx" | "gltf" | "glb";
+  categoryId: string;
   defaultScale: [number, number, number];
   defaultRotation: [number, number, number];
   defaultOffset: [number, number, number];
