@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { Box, useFBX, useGLTF } from "@react-three/drei";
 import { RoomObject } from "@/types/objects";
 import { FURNITURE_CATALOG } from "@/data/FurnitureCatalog";
@@ -16,7 +16,7 @@ const FurnitureItem = forwardRef<THREE.Object3D, FurnitureItemProps>(
       (item) => item.id === object.catalogId
     );
 
-    const { selectObject, selectedObjectId } = useRoom();
+    const { selectObject } = useRoom();
 
     const fbxModel = useFBX(
       catalogObject?.type === "fbx"
@@ -31,7 +31,11 @@ const FurnitureItem = forwardRef<THREE.Object3D, FurnitureItemProps>(
 
     const glbModel = useGLTF(
       catalogObject?.type === "glb"
-        ? "/models/" + catalogObject.id + "/model.glb"
+        ? "/models/" +
+            catalogObject.categoryId +
+            "/" +
+            catalogObject.id +
+            ".glb"
         : "/models/empty.gltf"
     );
 
@@ -45,17 +49,29 @@ const FurnitureItem = forwardRef<THREE.Object3D, FurnitureItemProps>(
       return model.clone();
     }, [model]);
 
-    const helperRef = useRef<THREE.BoxHelper>(null);
+    const dims = useMemo(() => {
+      if (!modelInstance || !catalogObject)
+        return [1, 1, 1] as [number, number, number];
 
-    useEffect(() => {
-      if (ref && "current" in ref && ref.current && helperRef.current) {
-        helperRef.current.setFromObject(ref.current);
-      }
-    }, [modelInstance, ref]);
+      modelInstance.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(modelInstance);
+
+      // Apply defaultScale
+      const defaultScale = catalogObject.defaultScale || [1, 1, 1];
+      const scale = new THREE.Vector3(
+        defaultScale[0] || 1,
+        defaultScale[1] || 1,
+        defaultScale[2] || 1
+      );
+      const min = box.min.clone().multiply(scale);
+      const max = box.max.clone().multiply(scale);
+      const size = new THREE.Vector3().subVectors(max, min);
+
+      return [size.x, size.y, size.z] as [number, number, number];
+    }, [modelInstance, catalogObject]);
 
     if (!model || !modelInstance || !catalogObject) return null;
 
-    const boundingBox = new THREE.BoxHelper(modelInstance, 0x00ff00);
     return (
       <>
         <primitive
@@ -63,27 +79,17 @@ const FurnitureItem = forwardRef<THREE.Object3D, FurnitureItemProps>(
           object={modelInstance}
           position={object.position}
           rotation={object.rotation}
-          scale={catalogObject.defaultScale}
-          onClick={(e: ThreeEvent<PointerEvent>) => {
-            e.stopPropagation();
-            selectObject(selectedObjectId == object.id ? null : object.id);
-          }}
-        />
-        <primitive
-          object={boundingBox}
-          ref={helperRef}
-          visible={object.showBoundingBox}
+          scale={catalogObject.defaultScale || [1, 1, 1]}
         />
         <Box
-          visible={object.showBoundingBox}
-          args={catalogObject.dimensions}
-          position={[
-            object.position[0],
-            catalogObject.dimensions[1] / 2,
-            object.position[2],
-          ]}
+          visible={false}
+          args={dims}
+          onClick={(e: ThreeEvent<PointerEvent>) => {
+            e.stopPropagation();
+            selectObject(object.id);
+          }}
+          position={[object.position[0], dims[1] / 2, object.position[2]]}
           rotation={object.rotation}
-          raycast={() => null}
         >
           <meshStandardMaterial
             opacity={0.5}

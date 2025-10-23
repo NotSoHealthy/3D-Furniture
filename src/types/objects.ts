@@ -9,10 +9,9 @@ export type CatalogObject = {
   name: string;
   type: "fbx" | "gltf" | "glb";
   categoryId: string;
-  defaultScale: [number, number, number];
+  defaultScale?: [number, number, number];
   defaultRotation: [number, number, number];
   defaultOffset: [number, number, number];
-  dimensions: [number, number, number];
 };
 
 export type RoomObject = {

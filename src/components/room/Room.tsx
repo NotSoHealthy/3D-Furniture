@@ -12,6 +12,8 @@ import { GridOverlay } from "@/components/room/GridOverlay";
 import * as THREE from "three";
 import { useRoom } from "@/app/context/RoomProvider";
 import FurnitureItem from "./FurnitureItem";
+import { OBB } from "three/examples/jsm/Addons.js";
+import { OBBHelper } from "./OBBHelper";
 
 const INITIAL_WIDTH = 5;
 const INITIAL_HEIGHT = 4;
@@ -30,20 +32,13 @@ export default function Room() {
     transformMode,
     toggleTransformMode,
     removeObject,
-    setRoomObjects,
+    roomWidth,
+    roomHeight,
   } = useRoom();
   const [roomCells, setRoomCells] = useState<Cell[]>([]);
   const [roomPoints, setRoomPoints] = useState<GridPoint[]>([]);
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
-  const {
-    roomWidth,
-    roomHeight,
-    showGrid,
-    wallColor,
-    floorColor,
-    wallTexture,
-    floorTexture,
-  } = SidePanel();
+  const { showGrid } = SidePanel();
 
   const objectRefs = useRef<{ [id: string]: THREE.Object3D | null }>({});
 
@@ -51,7 +46,7 @@ export default function Room() {
     return (ref: THREE.Object3D | null) => {
       if (ref) objectRefs.current[id] = ref;
       else delete objectRefs.current[id];
-      // optional: run full check when object mounts/unmounts
+
       requestAnimationFrame(() => checkCollisions());
     };
   }
@@ -114,45 +109,86 @@ export default function Room() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [selectedObjectId]);
 
-  const lastCollisions = useRef<Set<string>>(new Set());
+  function ensureOBB(object: THREE.Object3D) {
+    if (!object.userData.originalObb) {
+      // Get bounding box in world space
+      const worldBox = new THREE.Box3().setFromObject(object);
+
+      // Extract size & center in world space
+      const size = new THREE.Vector3();
+      worldBox.getSize(size);
+      const center = new THREE.Vector3();
+      worldBox.getCenter(center);
+
+      // Convert world center back to local space
+      const localCenter = center
+        .clone()
+        .applyMatrix4(new THREE.Matrix4().copy(object.matrixWorld).invert());
+
+      // Save local-space OBB
+      object.userData.originalObb = new OBB(
+        localCenter,
+        size.multiplyScalar(0.5)
+      );
+      object.userData.obb = object.userData.originalObb.clone();
+    }
+  }
+
+  function updateOBB(object: THREE.Object3D) {
+    object.userData.obb.copy(object.userData.originalObb);
+    object.userData.obb.applyMatrix4(object.matrixWorld);
+  }
+
+  function updateOBBHelper(
+    object: THREE.Object3D,
+    scene: THREE.Scene,
+    isColliding: boolean
+  ) {
+    if (!object.userData.obb) return;
+
+    if (!object.userData.helper) {
+      const helper = new OBBHelper(object.userData.obb, 0xff0000); // red for collision
+      object.userData.helper = helper;
+      scene.add(helper);
+    }
+
+    object.userData.helper.obb = object.userData.obb;
+    object.userData.helper.update();
+
+    object.userData.helper.visible = isColliding;
+  }
 
   function checkCollisions() {
-    const boxA = new THREE.Box3();
-    const boxB = new THREE.Box3();
     const collisions = new Set<string>();
     const entries = Object.entries(objectRefs.current);
 
+    // First, compute OBBs
+    for (const [, ref] of entries) {
+      if (!ref) continue;
+      ensureOBB(ref);
+      updateOBB(ref);
+    }
+
+    // Then check collisions
     for (let i = 0; i < entries.length; i++) {
       const [idA, refA] = entries[i];
       if (!refA) continue;
-
-      boxA.setFromObject(refA);
 
       for (let j = i + 1; j < entries.length; j++) {
         const [idB, refB] = entries[j];
         if (!refB) continue;
 
-        boxB.setFromObject(refB);
-
-        if (boxA.intersectsBox(boxB)) {
-          // updateObject(idA, { showBoundingBox: true });
-          // updateObject(idB, { showBoundingBox: true });
+        if (refA.userData.obb.intersectsOBB(refB.userData.obb)) {
           collisions.add(idA);
           collisions.add(idB);
         }
       }
     }
-    if (
-      collisions.size !== lastCollisions.current.size ||
-      [...collisions].some((id) => !lastCollisions.current.has(id))
-    ) {
-      lastCollisions.current = new Set(collisions);
-      setRoomObjects((prev) =>
-        prev.map((obj) => ({
-          ...obj,
-          showBoundingBox: collisions.has(obj.id),
-        }))
-      );
+
+    // Update helpers only for collided objects
+    for (const [id, ref] of entries) {
+      if (!ref) continue;
+      updateOBBHelper(ref, ref.parent as THREE.Scene, collisions.has(id));
     }
   }
 
@@ -169,7 +205,7 @@ export default function Room() {
   return (
     <>
       <div className="absolute top-4 left-4 z-10">
-        <Leva fill={true} collapsed={true} />
+        <Leva fill={true} hidden={true} collapsed={true} />
       </div>
       <Canvas
         camera={{
@@ -180,6 +216,11 @@ export default function Room() {
           ],
           rotation: [-Math.PI / 2.3, 0, 0],
           fov: 50,
+        }}
+        shadows
+        gl={{ antialias: true }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
         }}
         onPointerMissed={() => {
           if (selectedObjectId) selectObject(null);
@@ -196,8 +237,8 @@ export default function Room() {
           minDistance={Math.max(roomWidth, roomHeight) * 0.5}
           maxDistance={Math.max(roomWidth * roomHeight * 0.3, 10)}
         />
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[10, 10, 10]} intensity={0.8} />
+        <ambientLight color={0xffffff} intensity={0.5} />
+        {/* <directionalLight position={[10, 10, 10]} intensity={0.8} /> */}
         {/* Boxes */}
         <GridBoxes
           roomCells={roomCells}
@@ -212,20 +253,16 @@ export default function Room() {
           showGrid={showGrid}
           roomPoints={roomPoints}
         />
-        {/* Walls */}
-        <Walls
-          roomWidth={roomWidth}
-          roomHeight={roomHeight}
-          wallColor={wallColor}
-          wallTexture={wallTexture}
-        />
-        {/* Floor */}
-        <Floor
-          roomWidth={roomWidth}
-          roomHeight={roomHeight}
-          floorColor={floorColor}
-          floorTexture={floorTexture}
-        />
+        <Walls />
+        <Floor />
+        {/* Objects */}
+        {roomObjects.map((object) => (
+          <FurnitureItem
+            key={object.id}
+            ref={setObjectRef(object.id)}
+            object={object}
+          />
+        ))}
         {selectedRef && (
           <TransformControls
             mode={transformMode === "rotate" ? "rotate" : "translate"}
@@ -250,14 +287,6 @@ export default function Room() {
             }}
           />
         )}
-        {/* Objects */}
-        {roomObjects.map((object) => (
-          <FurnitureItem
-            key={object.id}
-            ref={setObjectRef(object.id)}
-            object={object}
-          />
-        ))}
       </Canvas>
     </>
   );

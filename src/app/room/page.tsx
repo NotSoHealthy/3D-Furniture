@@ -5,23 +5,54 @@ import { useRoom } from "@/app/context/RoomProvider";
 import Image from "next/image";
 import { useState } from "react";
 import { CATEGORIES } from "@/data/FurnitureCatalog";
+import { FullscreenIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { WALL_TEXTURES, FLOOR_TEXTURES } from "@/data/FurnitureCatalog";
 
 export default function Page() {
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(true);
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(1);
-  const { addObject } = useRoom();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const {
+    addObject,
+    wallTextureId,
+    setWallTextureId,
+    floorTextureId,
+    setFloorTextureId,
+    roomWidth,
+    setRoomWidth,
+    roomHeight,
+    setRoomHeight,
+  } = useRoom();
 
   return (
-    <div className="h-full w-full flex flex-row">
+    <div className="h-full w-full flex flex-row overflow-hidden">
       <section
         id="scene"
-        className="flex basis-[75%] flex-col items-center justify-end relative h-full"
+        className={`flex basis-[75%] flex-col items-center justify-end relative h-full transition-all duration-300 ${
+          isFullscreen ? "flex-[1_0_100%] basis-full" : ""
+        }`}
       >
         <div className="absolute top-0 left-0 w-full h-full bg-[#E6E1DA]">
           <Room />
         </div>
+        <div className="absolute top-0 right-0 z-50 p-10">
+          <FullscreenIcon
+            className="cursor-pointer"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+          />
+        </div>
         <div
-          className="bg-white flex items-end z-50 rounded-t-2xl px-4 py-2 gap-1 cursor-pointer"
+          className={`relative bg-white flex items-end z-51 rounded-t-2xl px-4 py-2 gap-1 cursor-pointer transition-all duration-300 ${
+            isPopupOpen ? "bottom-[-120px]" : "bottom-0"
+          }`}
           onClick={() => setIsPopupOpen(!isPopupOpen)}
         >
           <Image src="icons/pullup-dot.svg" alt="" width={8} height={8} />
@@ -31,14 +62,78 @@ export default function Page() {
           <Image src="icons/pullup-dot.svg" alt="" width={8} height={8} />
         </div>
         <div
-          className={`bg-white w-full z-50 left-0 transition-all duration-300 ${
-            !isPopupOpen ? "h-0" : "h-[100px]"
+          className={`relative h-[120px] bg-white w-full z-50 left-0 flex flex-row items-center justify-center gap-2 transition-all duration-300 ${
+            isPopupOpen ? "bottom-[-120px]" : "bottom-0"
           }`}
-        ></div>
+        >
+          <div className="flex flex-col items-center justify-center">
+            <p>Room Dimensions</p>
+            <div className="flex flex-row gap-2">
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[#430702] font-semibold">Width</span>
+                <Input
+                  type="number"
+                  value={roomWidth}
+                  onChange={(e) => setRoomWidth(Number(e.target.value))}
+                  className="w-[150px]"
+                />
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[#430702] font-semibold">Length</span>
+                <Input
+                  type="number"
+                  value={roomHeight}
+                  onChange={(e) => setRoomHeight(Number(e.target.value))}
+                  className="w-[150px]"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center">
+            <p>Room Style</p>
+            <div className="flex flex-row gap-2">
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[#430702] font-semibold">Walls</span>
+                <Select value={wallTextureId} onValueChange={setWallTextureId}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select Wall Style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALL_TEXTURES.map((texture) => (
+                      <SelectItem key={texture.id} value={texture.id}>
+                        {texture.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[#430702] font-semibold">Floor</span>
+                <Select
+                  value={floorTextureId}
+                  onValueChange={setFloorTextureId}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select Floor Style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FLOOR_TEXTURES.map((texture) => (
+                      <SelectItem key={texture.id} value={texture.id}>
+                        {texture.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
       <section
         id="gallery"
-        className="flex flex-1 flex-col border-l border-black/35"
+        className={`"flex relative flex-1 flex-col border-l border-black/35" ${
+          isFullscreen ? "right-[-100%] pointer-events-none" : "right-0"
+        }`}
       >
         <div className="flex flex-row w-full">
           {CATEGORIES.map((category, index) => (
@@ -103,7 +198,13 @@ export default function Page() {
                 }}
               >
                 <Image
-                  src={"/models/" + catalogObject.id + "/thumbnail.png"}
+                  src={
+                    "/models/" +
+                    catalogObject.categoryId +
+                    "/" +
+                    catalogObject.id +
+                    ".png"
+                  }
                   alt="logo"
                   fill
                   className="object-cover"

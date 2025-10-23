@@ -4,3 +4,15 @@ export type Cell = {
 };
 
 export type GridPoint = { x: number; y: number };
+
+export type WallTexture = {
+  id: string;
+  name: string;
+  url: string;
+};
+
+export type FloorTexture = {
+  id: string;
+  name: string;
+  url: string;
+};

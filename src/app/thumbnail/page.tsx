@@ -5,7 +5,9 @@ import { FURNITURE_CATALOG } from "@/data/FurnitureCatalog";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 
 export default function Page() {
-  const catalogObject = FURNITURE_CATALOG.find((item) => item.id === "bed");
+  const catalogObject = FURNITURE_CATALOG.find(
+    (item) => item.id === "office_chair"
+  );
   const model = useGLTF("/models/" + catalogObject?.id + "/model.glb");
 
   if (!catalogObject || !model) return null;
@@ -30,8 +32,8 @@ export default function Page() {
         minPolarAngle={0}
         maxPolarAngle={Math.PI / 2.05}
       />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 10, 10]} intensity={0.8} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[5, 1, 5]} intensity={1} />
       <primitive
         object={model.scene}
         position={[0, 0, 0]}
